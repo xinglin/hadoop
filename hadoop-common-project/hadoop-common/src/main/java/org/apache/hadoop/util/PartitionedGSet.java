@@ -68,7 +68,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
    * Consists of a hash table {@link LightWeightGSet} and a lock, which
    * controls access to this partition independently on the other ones.
    */
-  private class PartitionEntry extends LightWeightGSet<K, E> {
+  public class PartitionEntry extends LightWeightGSet<K, E> {
     private final LatchLock<?> partLock;
 
     PartitionEntry(int defaultPartitionCapacity) {
@@ -122,7 +122,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     return size;
   }
 
-  protected PartitionEntry getPartition(final K key) {
+  public PartitionEntry getPartition(final K key) {
     Entry<K, PartitionEntry> partEntry = partitions.floorEntry(key);
     if(partEntry == null) {
       return null;
@@ -147,11 +147,11 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
 
   @Override
   public E get(final K key) {
+    LOG.debug("get key: {}", key);
     PartitionEntry part = getPartition(key);
     if(part == null) {
       return null;
     }
-    LOG.debug("get key: {}", key);
     // part.partLock.readLock();
     return part.get(key);
   }
@@ -166,16 +166,23 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     assert size == 0 || part.partLock.isWriteTopLocked() ||
         part.partLock.hasWriteChildLock() :
           "Must hold write Lock: key = " + key;
-    LOG.debug("put key: {}", key);
+    LOG.debug("put key: {}, current PGSet size: {}", key, size);
     PartitionEntry newPart = addNewPartitionIfNeeded(part, key);
     if(newPart != part) {
       newPart.partLock.writeChildLock();
       part = newPart;
     }
+    LOG.debug("part.get  {}", part.get(key));
     E result = part.put(element);
     if(result == null) {  // new element
       size++;
+    } else {
+      LOG.debug("partitionPGSet.put: replace key {}", key);
     }
+    LOG.debug("PGSet size {}", size);
+
+    printStats();
+
     return result;
   }
 
@@ -212,7 +219,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     size = 0;
   }
 
-  private void printStats() {
+  public void printStats() {
     int partSizeMin = Integer.MAX_VALUE, partSizeAvg = 0, partSizeMax = 0;
     long totalSize = 0;
     int numEmptyPartitions = 0, numFullPartitions = 0;
@@ -231,15 +238,18 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
       try {
         long[] key = (long[]) inodeClass.
             getMethod("getNamespaceKey", int.class).invoke(e.getKey(), 2);
-        long[] firstKey = new long[0];
+        long[] firstKey = new long[key.length];
         if(part.iterator().hasNext()) {
           Object first = part.iterator().next();
-          firstKey = (long[]) inodeClass.getMethod(
+          long[] firstKeyRef = (long[]) inodeClass.getMethod(
             "getNamespaceKey", int.class).invoke(first, 2);
           Object parent = inodeClass.
               getMethod("getParent").invoke(first);
           long parentId = (parent == null ? 0L :
             (long) inodeClass.getMethod("getId").invoke(parent));
+
+          for(int j=0; j < key.length; j++)
+            firstKey[j] = firstKeyRef[j];
           firstKey[0] = parentId;
         }
         LOG.error("Partition #{}\t key: {}\t size: {}\t first: {}",
@@ -251,8 +261,8 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     partSizeAvg = (int) (totalSize / parts.size());
     LOG.error("Partition sizes: min = {}, avg = {}, max = {}, sum = {}",
         partSizeMin, partSizeAvg, partSizeMax, totalSize);
-    LOG.error("Number of partitions: empty = {}, full = {}",
-        numEmptyPartitions, numFullPartitions);
+    LOG.error("Number of partitions: empty = {}, full = {}, in-use = {}",
+        numEmptyPartitions, numFullPartitions, parts.size()-numEmptyPartitions);
   }
 
   @Override

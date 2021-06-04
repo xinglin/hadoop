@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.GSet;
 import org.apache.hadoop.util.LatchLock;
 import org.apache.hadoop.util.LightWeightGSet;
@@ -32,7 +33,7 @@ import org.apache.hadoop.util.PartitionedGSet;
 
 /**
  * Storing all the {@link INode}s and maintaining the mapping between INode ID
- * and INode.  
+ * and INode.
  */
 public class INodeMap {
   static final int NAMESPACE_KEY_DEBTH = 2;
@@ -184,6 +185,7 @@ public class INodeMap {
   /** Synchronized by external lock. */
   private final GSet<INode, INodeWithAdditionalFields> map;
   private FSNamesystem namesystem;
+  private final int PARTITION_NUM;
 
   public Iterator<INodeWithAdditionalFields> getMapIterator() {
     return map.iterator();
@@ -191,6 +193,7 @@ public class INodeMap {
 
   private INodeMap(INodeDirectory rootDir, FSNamesystem ns) {
     this.namesystem = ns;
+    PARTITION_NUM = ns.getInodeMapPartitions();
     // Compute the map capacity by allocating 1% of total memory
     int capacity = LightWeightGSet.computeCapacity(1, "INodeMap");
     this.map = new PartitionedGSet<>(capacity, new INodeKeyComparator(),
@@ -201,7 +204,7 @@ public class INodeMap {
         (PartitionedGSet<INode, INodeWithAdditionalFields>) map;
     PermissionStatus perm = new PermissionStatus(
         "", "", new FsPermission((short) 0));
-    for(int p = 0; p < NUM_RANGES_STATIC; p++) {
+    for(int p = 0; p < PARTITION_NUM; p++) {
       INodeDirectory key = new INodeDirectory(
           INodeId.ROOT_INODE_ID, "range key".getBytes(), perm, 0);
       key.setParent(new INodeDirectory((long)p, null, perm, 0));
@@ -212,16 +215,20 @@ public class INodeMap {
   }
 
   /**
-   * Add an {@link INode} into the {@link INode} map. Replace the old value if 
-   * necessary. 
+   * Add an {@link INode} into the {@link INode} map. Replace the old value if
+   * necessary.
    * @param inode The {@link INode} to be added to the map.
    */
   public final void put(INode inode) {
     if (inode instanceof INodeWithAdditionalFields) {
+      FSDirectory.LOG.debug("put: inode={}, namespacekey={}", inode.getId(),
+          inode.getNamespaceKey(NAMESPACE_KEY_DEBTH));
       map.put((INodeWithAdditionalFields)inode);
+    } else if (inode instanceof INodeReference) {
+      FSDirectory.LOG.error("inode {} is an INodeReference", inode.getId());
     }
   }
-  
+
   /**
    * Remove a {@link INode} from the map.
    * @param inode The {@link INode} to be removed.
@@ -229,65 +236,95 @@ public class INodeMap {
   public final void remove(INode inode) {
     map.remove(inode);
   }
-  
+
   /**
    * @return The size of the map.
    */
   public int size() {
     return map.size();
   }
-  
+
   /**
    * Get the {@link INode} with the given id from the map.
    * @param id ID of the {@link INode}.
-   * @return The {@link INode} in the map with the given id. Return null if no 
+   * @return The {@link INode} in the map with the given id. Return null if no
    *         such {@link INode} in the map.
    */
   public INode get(long id) {
+    /* iterate all partitions of PGSet and return the INode */
+    /* Deprecated. Just for fallback. */
+    PartitionedGSet<INode, INodeWithAdditionalFields> pgs =
+        (PartitionedGSet<INode, INodeWithAdditionalFields>) map;
+
     INode inode = new INodeWithAdditionalFields(id, null, new PermissionStatus(
         "", "", new FsPermission((short) 0)), 0, 0) {
-      
       @Override
       void recordModification(int latestSnapshotId) {
+
       }
-      
+
+      @Override
+      public void cleanSubtree(ReclaimContext reclaimContext, int snapshotId, int priorSnapshotId) {
+
+      }
+
       @Override
       public void destroyAndCollectBlocks(ReclaimContext reclaimContext) {
-        // Nothing to do
+
       }
 
       @Override
-      public QuotaCounts computeQuotaUsage(
-          BlockStoragePolicySuite bsps, byte blockStoragePolicyId,
-          boolean useCache, int lastSnapshotId) {
+      public ContentSummaryComputationContext computeContentSummary(int snapshotId,
+          ContentSummaryComputationContext summary) throws AccessControlException {
         return null;
       }
 
       @Override
-      public ContentSummaryComputationContext computeContentSummary(
-          int snapshotId, ContentSummaryComputationContext summary) {
+      public QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, byte blockStoragePolicyId, boolean useCache,
+          int lastSnapshotId) {
         return null;
-      }
-      
-      @Override
-      public void cleanSubtree(
-          ReclaimContext reclaimContext, int snapshotId, int priorSnapshotId) {
       }
 
       @Override
-      public byte getStoragePolicyID(){
-        return HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
+      public byte getStoragePolicyID() {
+        return 0;
       }
 
       @Override
       public byte getLocalStoragePolicyID() {
-        return HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
+        return 0;
       }
     };
-      
+
+    PermissionStatus perm = new PermissionStatus(
+        "", "", new FsPermission((short) 0));
+    // TODO: create a static array, to avoid creation of keys every time.
+    for(int p = 0; p < PARTITION_NUM; p++) {
+      INodeDirectory key = new INodeDirectory(
+          INodeId.ROOT_INODE_ID, "range key".getBytes(), perm, 0);
+      key.setParent(new INodeDirectory((long)p, null, perm, 0));
+      PartitionedGSet.PartitionEntry e = pgs.getPartition(key);
+
+      if(e.contains(key))
+        return (INode)e.get(key);
+    }
+
+    return null;
+  }
+
+  /**
+   * TODO: should implement a get() by namespacekey, instead of INode object
+   * @param inode
+   * @return
+   */
+  public INode get(INode inode) {
     return map.get(inode);
   }
-  
+
+  public void show() {
+    ((PartitionedGSet)map).printStats();
+  }
+
   /**
    * Clear the {@link #map}
    */

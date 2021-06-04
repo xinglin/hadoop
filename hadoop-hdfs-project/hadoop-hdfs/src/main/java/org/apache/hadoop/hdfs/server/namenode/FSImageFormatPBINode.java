@@ -83,7 +83,7 @@ public final class FSImageFormatPBINode {
   public static final int ACL_ENTRY_TYPE_OFFSET = 3;
   public static final int ACL_ENTRY_SCOPE_OFFSET = 5;
   public static final int ACL_ENTRY_PERM_MASK = 7;
-  
+
   public static final int XATTR_NAMESPACE_MASK = 3;
   public static final int XATTR_NAMESPACE_OFFSET = 30;
   public static final int XATTR_NAME_MASK = (1 << 24) - 1;
@@ -114,7 +114,7 @@ public final class FSImageFormatPBINode {
       }
       return b.build();
     }
-    
+
     public static List<XAttr> loadXAttrs(
         XAttrFeatureProto proto, final StringTable stringTable) {
       List<XAttr> b = new ArrayList<>();
@@ -126,7 +126,7 @@ public final class FSImageFormatPBINode {
         }
         b.add(XAttrFormat.toXAttr(v, value, stringTable));
       }
-      
+
       return b;
     }
 
@@ -276,9 +276,9 @@ public final class FSImageFormatPBINode {
         if (e == null) {
           break;
         }
-        INodeDirectory p = dir.getInode(e.getParent()).asDirectory();
+        INodeDirectory p = dir.getInodeFromTempINodeMap(e.getParent()).asDirectory();
         for (long id : e.getChildrenList()) {
-          INode child = dir.getInode(id);
+          INode child = dir.getInodeFromTempINodeMap(id);
           if (!addToParent(p, child)) {
             LOG.warn("Failed to add the inode {} to the directory {}",
                 child.getId(), p.getId());
@@ -382,6 +382,7 @@ public final class FSImageFormatPBINode {
         if (p == null) {
           break;
         }
+        LOG.debug("loadINodesInSection: cntr={}, inode={}", cntr, p.getId());
         if (p.getId() == INodeId.ROOT_INODE_ID) {
           synchronized(this) {
             loadRootINode(p);
@@ -389,7 +390,7 @@ public final class FSImageFormatPBINode {
         } else {
           INode n = loadINode(p);
           synchronized(this) {
-            dir.addToInodeMap(n);
+            dir.addToTempInodeMap(n);
           }
           fillUpInodeList(inodeList, n);
         }
@@ -656,7 +657,7 @@ public final class FSImageFormatPBINode {
         }
         b.addXAttrs(xAttrCompactBuilder.build());
       }
-      
+
       return b;
     }
 
@@ -740,6 +741,7 @@ public final class FSImageFormatPBINode {
       this.numImageErrors = 0;
     }
 
+    /* process INodes with child inodes (dirs). */
     void serializeINodeDirectorySection(OutputStream out) throws IOException {
       FSDirectory dir = fsn.getFSDirectory();
       Iterator<INodeWithAdditionalFields> iter = dir.getINodeMap()
@@ -761,7 +763,7 @@ public final class FSImageFormatPBINode {
               DirEntry.newBuilder().setParent(n.getId());
           for (INode inode : children) {
             // Error if the child inode doesn't exist in inodeMap
-            if (dir.getInode(inode.getId()) == null) {
+            if (dir.getInode(inode) == null) {
               FSImage.LOG.error(
                   "FSImageFormatPBINode#serializeINodeDirectorySection: " +
                       "Dangling child pointer found. Missing INode in " +
@@ -812,6 +814,7 @@ public final class FSImageFormatPBINode {
       Iterator<INodeWithAdditionalFields> iter = inodesMap.getMapIterator();
       while (iter.hasNext()) {
         INodeWithAdditionalFields n = iter.next();
+        LOG.debug("i = {}, save inode: {}", i, n);
         save(out, n);
         ++i;
         if (i % FSImageFormatProtobuf.Saver.CHECK_CANCEL_INTERVAL == 0) {
@@ -831,6 +834,7 @@ public final class FSImageFormatPBINode {
       Collection<Long> filesWithUC = fsn.getLeaseManager()
               .getINodeIdWithLeases();
       for (Long id : filesWithUC) {
+        // TODO: need fix getInode(id)
         INode inode = fsn.getFSDirectory().getInode(id);
         if (inode == null) {
           LOG.warn("Fail to find inode " + id + " when saving the leases.");

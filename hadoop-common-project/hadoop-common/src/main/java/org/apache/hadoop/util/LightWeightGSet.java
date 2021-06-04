@@ -262,8 +262,25 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
   @Override
   public String toString() {
     final StringBuilder b = new StringBuilder(getClass().getSimpleName());
+    int count1 = 0, count2 = 0;
+    for (int i = 0; i < entries.length; i++) {
+      LinkedElement e = entries[i];
+      while( e != null ) {
+        count1 ++;
+        e = e.getNext();
+      }
+    }
+
+    Iterator<E> iter = iterator();
+    while (iter.hasNext()) {
+      count2 ++;
+      iter.next();
+    }
+
     b.append("(size=").append(size)
-     .append(String.format(", %08x", hash_mask))
+        .append(", count1=").append(count1)
+        .append(", count2=").append(count2)
+        .append(String.format(", %08x", hash_mask))
      .append(", modification=").append(modification)
      .append(", entries.length=").append(entries.length)
      .append(")");
@@ -351,7 +368,7 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
       this.trackModification = trackModification;
     }
   }
-  
+
   /**
    * Let t = percentage of max memory.
    * Let e = round(log_2 t).
@@ -362,7 +379,7 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
     return computeCapacity(Runtime.getRuntime().maxMemory(), percentage,
         mapName);
   }
-  
+
   @VisibleForTesting
   static int computeCapacity(long maxMemory, double percentage,
       String mapName) {
@@ -385,7 +402,7 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
     //Percentage of max memory
     final double percentDivisor = 100.0/percentage;
     final double percentMemory = maxMemory/percentDivisor;
-    
+
     //compute capacity
     final int e1 = (int)(Math.log(percentMemory)/Math.log(2.0) + 0.5);
     final int e2 = e1 - ("32".equals(vmBit)? 2: 3);
@@ -402,7 +419,7 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
     LOG.info("capacity      = 2^" + exponent + " = " + c + " entries");
     return c;
   }
-  
+
   public void clear() {
     modification++;
     Arrays.fill(entries, null);
