@@ -1168,7 +1168,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY = "dfs.namenode.resource.check.interval";
   public static final int     DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
   public static final String  DFS_NAMENODE_INODEMAP_PARTITIONS_KEY = "dfs.namenode.inodemap.partitions";
-  public static final int     DFS_NAMENODE_INODEMAP_PARTITIONS_DEFAULT = 256;
+  public static final int     DFS_NAMENODE_INODEMAP_PARTITIONS_DEFAULT = 8;
   public static final String  DFS_NAMENODE_DU_RESERVED_KEY = "dfs.namenode.resource.du.reserved";
   public static final long    DFS_NAMENODE_DU_RESERVED_DEFAULT = 1024 * 1024 * 100; // 100 MB
   public static final String  DFS_NAMENODE_CHECKED_VOLUMES_KEY = "dfs.namenode.resource.checked.volumes";

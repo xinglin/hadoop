@@ -1404,7 +1404,7 @@ public class FSDirectory implements Closeable {
       if (!isRename) {
         copyINodeDefaultAcl(inode, modes);
       }
-      FSNamesystem.LOG.debug("addLastINode created {} on path {}", inode, existing.getPath());
+      FSNamesystem.LOG.debug("addLastINode created {} on path {}", inode.getLocalName(), existing.getPath());
       addToInodeMap(inode);
     }
     return INodesInPath.append(existing, inode, inode.getLocalNameBytes());
@@ -1608,7 +1608,7 @@ public class FSDirectory implements Closeable {
       inodeMap.put(n);
       i++;
     }
-    LOG.debug("populate {} inodes, count is {}, values.size() is {}", inodeMapTemp.size(), i,
+    LOG.debug("populate {} inodes, inodeMapTemp.size() is {}, values.size() is {}", i, inodeMapTemp.size(),
         inodeMapTemp.values().size());
     inodeMap.show();
     inodeMapTemp.clear();

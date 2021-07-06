@@ -741,6 +741,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     long timeTakenToLoadFSImage = monotonicNow() - loadStart;
     LOG.info("Finished loading FSImage in " + timeTakenToLoadFSImage + " msecs");
+    LOG.info("INodeMap.size is " + namesystem.getFSDirectory().getINodeMap().size());
     NameNodeMetrics nnMetrics = NameNode.getNameNodeMetrics();
     if (nnMetrics != null) {
       nnMetrics.setFsImageLoadTime((int) timeTakenToLoadFSImage);

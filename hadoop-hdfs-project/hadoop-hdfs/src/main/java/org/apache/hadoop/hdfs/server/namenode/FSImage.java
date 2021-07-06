@@ -762,7 +762,10 @@ public class FSImage implements Closeable {
     }
     prog.endPhase(Phase.LOADING_FSIMAGE);
 
-    /* Move INodes from tempInodeMap to PGSet */
+    /*
+     * Move INodes from tempInodeMap to INodeMap, so that loadEdits can do its job to
+     *  add all new Inodes into the InodeMap.
+     */
     FSDirectory dir = target.getFSDirectory();
     dir.populateINodeMap();
 

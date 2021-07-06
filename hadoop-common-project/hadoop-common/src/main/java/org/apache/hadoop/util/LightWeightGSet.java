@@ -278,8 +278,8 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
     }
 
     b.append("(size=").append(size)
-        .append(", count1=").append(count1)
-        .append(", count2=").append(count2)
+        .append(", count from linkedElement=").append(count1)
+        .append(", count from iterator=").append(count2)
         .append(String.format(", %08x", hash_mask))
      .append(", modification=").append(modification)
      .append(", entries.length=").append(entries.length)

@@ -23,7 +23,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.GSet;
@@ -36,12 +35,12 @@ import org.apache.hadoop.util.PartitionedGSet;
  * and INode.
  */
 public class INodeMap {
-  static final int NAMESPACE_KEY_DEBTH = 2;
-  static final int NUM_RANGES_STATIC = 256;  // power of 2
+  static final int NAMESPACE_KEY_DEPTH = 2;
+  static final int NUM_RANGES_STATIC = 8;  // power of 2
 
   public static class INodeKeyComparator implements Comparator<INode> {
     INodeKeyComparator() {
-      FSDirectory.LOG.info("Namespace key debth = {}", NAMESPACE_KEY_DEBTH);
+      FSDirectory.LOG.info("Namespace key debth = {}", NAMESPACE_KEY_DEPTH);
     }
 
     @Override
@@ -49,9 +48,9 @@ public class INodeMap {
       if (i1 == null || i2 == null) {
         throw new NullPointerException("Cannot compare null INodes");
       }
-      long[] key1 = i1.getNamespaceKey(NAMESPACE_KEY_DEBTH);
-      long[] key2 = i2.getNamespaceKey(NAMESPACE_KEY_DEBTH);
-      for(int l = 0; l < NAMESPACE_KEY_DEBTH; l++) {
+      long[] key1 = i1.getNamespaceKey(NAMESPACE_KEY_DEPTH);
+      long[] key2 = i2.getNamespaceKey(NAMESPACE_KEY_DEPTH);
+      for(int l = 0; l < NAMESPACE_KEY_DEPTH; l++) {
         if(key1[l] == key2[l]) continue;
         return (key1[l] < key2[l] ? -1 : 1);
       }
@@ -65,7 +64,7 @@ public class INodeMap {
    */
   public static class HPINodeKeyComparator implements Comparator<INode> {
     HPINodeKeyComparator() {
-      FSDirectory.LOG.info("Namespace key debth = {}", NAMESPACE_KEY_DEBTH);
+      FSDirectory.LOG.info("Namespace key debth = {}", NAMESPACE_KEY_DEPTH);
     }
 
     @Override
@@ -73,13 +72,13 @@ public class INodeMap {
       if (i1 == null || i2 == null) {
         throw new NullPointerException("Cannot compare null INodes");
       }
-      long[] key1 = i1.getNamespaceKey(NAMESPACE_KEY_DEBTH);
-      long[] key2 = i2.getNamespaceKey(NAMESPACE_KEY_DEBTH);
+      long[] key1 = i1.getNamespaceKey(NAMESPACE_KEY_DEPTH);
+      long[] key2 = i2.getNamespaceKey(NAMESPACE_KEY_DEPTH);
       long key1_0 = INode.indexOf(key1);
       long key2_0 = INode.indexOf(key2);
       if(key1_0 != key2_0)
         return (key1_0 < key2_0 ? -1 : 1);
-      for(int l = 1; l < NAMESPACE_KEY_DEBTH; l++) {
+      for(int l = 1; l < NAMESPACE_KEY_DEPTH; l++) {
         if(key1[l] == key2[l]) continue;
         return (key1[l] < key2[l] ? -1 : 1);
       }
@@ -185,7 +184,7 @@ public class INodeMap {
   /** Synchronized by external lock. */
   private final GSet<INode, INodeWithAdditionalFields> map;
   private FSNamesystem namesystem;
-  private final int PARTITION_NUM;
+  private final int PARTITION_NUM;    // not in use for now.
 
   public Iterator<INodeWithAdditionalFields> getMapIterator() {
     return map.iterator();
@@ -204,7 +203,8 @@ public class INodeMap {
         (PartitionedGSet<INode, INodeWithAdditionalFields>) map;
     PermissionStatus perm = new PermissionStatus(
         "", "", new FsPermission((short) 0));
-    for(int p = 0; p < PARTITION_NUM; p++) {
+    FSDirectory.LOG.debug("initialize PGSet: partition number is " + NUM_RANGES_STATIC);
+    for(int p = 0; p < NUM_RANGES_STATIC; p++) {
       INodeDirectory key = new INodeDirectory(
           INodeId.ROOT_INODE_ID, "range key".getBytes(), perm, 0);
       key.setParent(new INodeDirectory((long)p, null, perm, 0));
@@ -222,7 +222,7 @@ public class INodeMap {
   public final void put(INode inode) {
     if (inode instanceof INodeWithAdditionalFields) {
       FSDirectory.LOG.debug("put: inode={}, namespacekey={}", inode.getId(),
-          inode.getNamespaceKey(NAMESPACE_KEY_DEBTH));
+          inode.getNamespaceKey(NAMESPACE_KEY_DEPTH));
       map.put((INodeWithAdditionalFields)inode);
     } else if (inode instanceof INodeReference) {
       FSDirectory.LOG.error("inode {} is an INodeReference", inode.getId());
@@ -313,12 +313,27 @@ public class INodeMap {
   }
 
   /**
-   * TODO: should implement a get() by namespacekey, instead of INode object
    * @param inode
    * @return
    */
   public INode get(INode inode) {
-    return map.get(inode);
+
+    // Check whether this Inode has (NAMESPACE_KEY_DEPTH - 1) levels of parent dirs
+    int i = NAMESPACE_KEY_DEPTH - 1;
+    INode tmpInode = inode;
+    while (i > 0 && tmpInode.getParent() != null) {
+      tmpInode = tmpInode.getParent();
+      i -- ;
+    }
+
+    /*
+     * If the Inode has (NAMESPACE_KEY_DEPTH - 1) levels of parent dirs, use map.get().
+     * else, fall back to get INode based on Inode ID.
+     */
+    if (i == 0)
+      return map.get(inode);
+    else
+      return get(inode.getId());
   }
 
   public void show() {
