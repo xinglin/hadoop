@@ -763,11 +763,12 @@ public class FSImage implements Closeable {
     prog.endPhase(Phase.LOADING_FSIMAGE);
 
     /*
-     * Move INodes from tempInodeMap to INodeMap, so that loadEdits can do its job to
-     *  add all new Inodes into the InodeMap.
+     * loadEdits always sets the parent of an inode before adding the inode to inodeMap.
+     * So, we can move inodes from inodeMapTemp to inodeMap before loadEdits.
      */
     FSDirectory dir = target.getFSDirectory();
-    dir.populateINodeMap();
+    dir.moveInodes();
+    LOG.info("LOADING_FSIMAGE: loaded {} inodes into inodeMap", dir.getINodeMap().size());
 
     if (!rollingRollback) {
       prog.beginPhase(Phase.LOADING_EDITS);
@@ -784,6 +785,7 @@ public class FSImage implements Closeable {
     }
     editLog.setNextTxId(lastAppliedTxId + 1);
 
+    LOG.info("LOADING_EDITS: loaded {} inodes into inodeMap", dir.getINodeMap().size());
     return needToSave;
   }
 

@@ -1595,21 +1595,34 @@ public class FSDirectory implements Closeable {
   }
 
   /**
-   * Move finalized INodes from INodeMapTemp to INodeMap
+   * After the inodes are set properly (set the parent for each inode), we move them from INodeMapTemp to INodeMap.
    */
-  public void populateINodeMap() {
-    int i=0;
-    LOG.debug("populateINodeMap: inodeMapTemp={}", inodeMapTemp.toString());
+  public void moveInodes() throws IOException {
+    long count=0, inodeNum = inodeMapTemp.size();
+    LOG.debug("inodeMapTemp={}", inodeMapTemp);
 
-    Iterator<INodeWithAdditionalFields> iter = inodeMapTemp.iterator();
-    while (iter.hasNext()) {
-      INodeWithAdditionalFields n = iter.next();
-      LOG.debug("i = {}, populate inode: {}", i, n);
+    /**
+     * Note:
+     * we can not use the iterator interface from LightWeightGSet to move inodes from inodeMapTemp to inodeMap.
+     * When we put an Inode into inodeMap, it will set the next pointer of this Inode object to a different value:
+     * we are effectively modifying the linked lists in inodeMapTemp when we are moving inodes using the iterator
+     * interface. To avoid this problem, we thus first remove an inode from inodeMapTemp and then add it to inodeMap.
+     */
+    while (inodeMapTemp.size() > 0) {
+      INodeWithAdditionalFields n = inodeMapTemp.iterator().next();
+      inodeMapTemp.remove(n);
+
+      LOG.debug("populate {}-th inode: id={}, fullpath={}", count, n.getId(), n.getFullPathName());
+
       inodeMap.put(n);
-      i++;
+      count++;
     }
-    LOG.debug("populate {} inodes, inodeMapTemp.size() is {}, values.size() is {}", i, inodeMapTemp.size(),
-        inodeMapTemp.values().size());
+
+    if (count != inodeNum) {
+      String msg = String.format("moveInodes: expected to move %l inodes, but moved %l inodes", inodeNum, count);
+      throw new IOException(msg);
+    }
+
     inodeMap.show();
     inodeMapTemp.clear();
   }

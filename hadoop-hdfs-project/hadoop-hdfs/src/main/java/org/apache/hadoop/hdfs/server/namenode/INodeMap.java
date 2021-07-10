@@ -330,10 +330,13 @@ public class INodeMap {
      * If the Inode has (NAMESPACE_KEY_DEPTH - 1) levels of parent dirs, use map.get().
      * else, fall back to get INode based on Inode ID.
      */
-    if (i == 0)
+    if (i == 0) {
+      FSDirectory.LOG.debug("INodeMap.get: use INode Object from PGSet");
       return map.get(inode);
-    else
+    } else {
+      FSDirectory.LOG.debug("INodeMap.get: fall back to get INode based on Inode ID");
       return get(inode.getId());
+    }
   }
 
   public void show() {

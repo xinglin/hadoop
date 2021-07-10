@@ -69,7 +69,10 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
   protected LinkedElement[] entries;
   /** A mask for computing the array index from the hash value of an element. */
   protected int hash_mask;
-  /** The size of the set (not the entry array). */
+  /**
+   * The size of the set (not the entry array).
+   * TODO: change from int to long.
+   */
   protected int size = 0;
   /** Modification version for fail-fast.
    * @see ConcurrentModificationException

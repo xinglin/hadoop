@@ -25,9 +25,11 @@ import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
+
 
 /**
  * An implementation of {@link GSet}, which splits a collection of elements
@@ -172,16 +174,16 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
       newPart.partLock.writeChildLock();
       part = newPart;
     }
-    LOG.debug("part.get  {}", part.get(key));
+
     E result = part.put(element);
     if(result == null) {  // new element
       size++;
+      LOG.debug("partitionPGSet.put: added key {}, size is now {} ", key, size);
     } else {
-      LOG.debug("partitionPGSet.put: replace key {}", key);
+      LOG.debug("partitionPGSet.put: replaced key {}, size is now {}", key, size);
     }
-    LOG.debug("PGSet size {}", size);
 
-    printStats();
+    //printStats();
 
     return result;
   }
@@ -252,16 +254,16 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
             firstKey[j] = firstKeyRef[j];
           firstKey[0] = parentId;
         }
-        LOG.error("Partition #{}\t key: {}\t size: {}\t first: {}",
+        LOG.debug("Partition #{}\t key: {}\t size: {}\t first: {}",
             i++, key, s, firstKey);  // SHV should be info
       } catch (Exception ex) {
         LOG.error("Cannot find Method getNamespaceKey() in {}", inodeClass);
       }
     }
     partSizeAvg = (int) (totalSize / parts.size());
-    LOG.error("Partition sizes: min = {}, avg = {}, max = {}, sum = {}",
+    LOG.debug("Partition sizes: min = {}, avg = {}, max = {}, sum = {}",
         partSizeMin, partSizeAvg, partSizeMax, totalSize);
-    LOG.error("Number of partitions: empty = {}, full = {}, in-use = {}",
+    LOG.debug("Number of partitions: empty = {}, full = {}, in-use = {}",
         numEmptyPartitions, numFullPartitions, parts.size()-numEmptyPartitions);
   }
 
@@ -269,6 +271,115 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
   public Collection<E> values() {
     // TODO Auto-generated method stub
     return null;
+  }
+
+  private static class MyInteger implements LinkedElement {
+    private LinkedElement next = null;
+    private int val;
+
+    public MyInteger(int i) {
+      val = i;
+    }
+
+    public int get(){
+      return val;
+    }
+
+    @Override
+    public void setNext(LinkedElement next) {
+        this.next = next;
+    }
+
+    @Override
+    public LinkedElement getNext() {
+      return next;
+    }
+  }
+  public static void main(String[] args) {
+    Comparator<MyInteger> comp = new Comparator<MyInteger>() {
+      @Override
+      public int compare(MyInteger o1, MyInteger o2) {
+        return o1.get() - o2.get();
+      }
+
+    };
+
+    LatchLock<ReentrantLock> lk = new LatchLock<ReentrantLock>() {
+      @Override
+      protected boolean isReadTopLocked() {
+        return false;
+      }
+
+      @Override
+      protected boolean isWriteTopLocked() {
+        return false;
+      }
+
+      @Override
+      protected void readTopdUnlock() {
+
+      }
+
+      @Override
+      protected void writeTopUnlock() {
+
+      }
+
+      @Override
+      protected boolean hasReadChildLock() {
+        return false;
+      }
+
+      @Override
+      protected void readChildLock() {
+
+      }
+
+      @Override
+      protected void readChildUnlock() {
+
+      }
+
+      @Override
+      protected boolean hasWriteChildLock() {
+        return false;
+      }
+
+      @Override
+      protected void writeChildLock() {
+
+      }
+
+      @Override
+      protected void writeChildUnlock() {
+
+      }
+
+      @Override
+      protected LatchLock<ReentrantLock> clone() {
+        return null;
+      }
+    };
+
+    System.out.println("hello test");
+    PartitionedGSet<MyInteger, MyInteger> map = new PartitionedGSet<>(200, comp, lk, new MyInteger(0));
+
+    map.addNewPartition(new MyInteger(0));
+    map.addNewPartition(new MyInteger(100));
+    map.addNewPartition(new MyInteger(200));
+
+    map.put(new MyInteger(1));
+    map.put(new MyInteger(100));
+
+    System.out.println("size is " + map.size());
+    Iterator<MyInteger> iter = map.iterator();
+    int i = 0;
+    while(iter.hasNext()) {
+      MyInteger num = iter.next();
+      System.out.println("i="+ i +", num = " + num.get());
+      i ++;
+    }
+
   }
 
   @Override
@@ -290,7 +401,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
 
     public EntryIterator() {
       keyIterator = partitions.keySet().iterator();
-      K curKey = partitions.firstKey();
+      K curKey = keyIterator.next();
       partitionIterator = getPartition(curKey).iterator();
     }
 
@@ -303,15 +414,14 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
         K curKey = keyIterator.next();
         partitionIterator = getPartition(curKey).iterator();
       }
+
       return partitionIterator.hasNext();
     }
 
     @Override
     public E next() {
-      while(!partitionIterator.hasNext()) {
-        K curKey = keyIterator.next();
-        partitionIterator = getPartition(curKey).iterator();
-      }
+      if (!hasNext())
+        return null;
       return partitionIterator.next();
     }
   }
