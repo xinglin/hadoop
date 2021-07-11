@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -289,14 +290,26 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     private final Iterator<K> keyIterator;
     private Iterator<E> partitionIterator;
 
+    // Set partitionIterator to point to the first partition,
+    // or set it to null when there is no partitions created for this PartitionedGSet.
     public EntryIterator() {
       keyIterator = partitions.keySet().iterator();
-      K curKey = keyIterator.next();
-      partitionIterator = getPartition(curKey).iterator();
+
+      if (!keyIterator.hasNext()) {
+        partitionIterator = null;
+        return;
+      }
+
+      K firstKey = keyIterator.next();
+      partitionIterator = partitions.get(firstKey).iterator();
+
     }
 
     @Override
     public boolean hasNext() {
+      if (partitionIterator == null)
+        return false;
+
       while(!partitionIterator.hasNext()) {
         if(!keyIterator.hasNext()) {
           return false;
@@ -309,9 +322,9 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     }
 
     @Override
-    public E next() {
+    public E next() throws NoSuchElementException {
       if (!hasNext())
-        return null;
+        throw new NoSuchElementException("No more elements in this set.");
       return partitionIterator.next();
     }
   }
