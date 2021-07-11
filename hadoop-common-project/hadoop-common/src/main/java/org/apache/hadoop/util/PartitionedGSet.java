@@ -81,8 +81,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
 
   public PartitionedGSet(final int capacity,
       final Comparator<? super K> comparator,
-      final LatchLock<?> latchLock,
-      final E rootKey) {
+      final LatchLock<?> latchLock) {
     this.partitions = new TreeMap<K, PartitionEntry>(comparator);
     this.latchLock = latchLock;
     // addNewPartition(rootKey).put(rootKey);
@@ -316,7 +315,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
       }
 
       @Override
-      protected void readTopdUnlock() {
+      protected void readTopUnlock() {
 
       }
 
@@ -362,7 +361,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     };
 
     System.out.println("hello test");
-    PartitionedGSet<MyInteger, MyInteger> map = new PartitionedGSet<>(200, comp, lk, new MyInteger(0));
+    PartitionedGSet<MyInteger, MyInteger> map = new PartitionedGSet<>(200, comp, lk);
 
     map.addNewPartition(new MyInteger(0));
     map.addNewPartition(new MyInteger(100));
