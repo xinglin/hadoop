@@ -1608,9 +1608,10 @@ public class FSDirectory implements Closeable {
      * we are effectively modifying the linked lists in inodeMapTemp when we are moving inodes using the iterator
      * interface. To avoid this problem, we thus first remove an inode from inodeMapTemp and then add it to inodeMap.
      */
-    while (inodeMapTemp.size() > 0) {
-      INodeWithAdditionalFields n = inodeMapTemp.iterator().next();
-      inodeMapTemp.remove(n);
+    Iterator<INodeWithAdditionalFields> iter = inodeMapTemp.iterator();
+    while ( iter.hasNext() ) {
+      INodeWithAdditionalFields n = iter.next();
+      iter.remove();
 
       LOG.debug("populate {}-th inode: id={}, fullpath={}", count, n.getId(), n.getFullPathName());
 
