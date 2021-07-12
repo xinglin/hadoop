@@ -834,7 +834,6 @@ public final class FSImageFormatPBINode {
       Collection<Long> filesWithUC = fsn.getLeaseManager()
               .getINodeIdWithLeases();
       for (Long id : filesWithUC) {
-        // TODO: need fix getInode(id)
         INode inode = fsn.getFSDirectory().getInode(id);
         if (inode == null) {
           LOG.warn("Fail to find inode " + id + " when saving the leases.");

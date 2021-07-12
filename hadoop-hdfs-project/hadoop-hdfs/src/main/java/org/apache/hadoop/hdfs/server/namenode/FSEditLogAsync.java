@@ -125,7 +125,6 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
 
   @Override
   void logEdit(final FSEditLogOp op) {
-    LOG.debug("op={}", op);
     Edit edit = getEditInstance(op);
     THREAD_EDIT.set(edit);
     enqueueEdit(edit);

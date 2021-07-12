@@ -492,7 +492,6 @@ public final class FSImageFormatProtobuf {
           break;
         }
       }
-
       if (executorService != null) {
         executorService.shutdown();
       }

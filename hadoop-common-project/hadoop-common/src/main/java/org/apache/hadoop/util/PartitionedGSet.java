@@ -31,7 +31,6 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
-
 /**
  * An implementation of {@link GSet}, which splits a collection of elements
  * into partitions each corresponding to a range of keys.

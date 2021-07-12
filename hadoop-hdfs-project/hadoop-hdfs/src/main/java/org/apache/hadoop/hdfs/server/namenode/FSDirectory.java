@@ -1355,13 +1355,6 @@ public class FSDirectory implements Closeable {
     assert existing.getLastINode() != null &&
         existing.getLastINode().isDirectory();
 
-    LOG.debug("addLastINode: Printing stack trace:");
-    StackTraceElement[] elements = Thread.currentThread().getStackTrace();
-    for (int i = 1; i < elements.length; i++) {
-      StackTraceElement s = elements[i];
-      LOG.debug("\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s.getLineNumber() + ")");
-    }
-
     final int pos = existing.length();
     // Disallow creation of /.reserved. This may be created when loading
     // editlog/fsimage during upgrade since /.reserved was a valid name in older
@@ -1404,7 +1397,6 @@ public class FSDirectory implements Closeable {
       if (!isRename) {
         copyINodeDefaultAcl(inode, modes);
       }
-      FSNamesystem.LOG.debug("addLastINode created {} on path {}", inode.getLocalName(), existing.getPath());
       addToInodeMap(inode);
     }
     return INodesInPath.append(existing, inode, inode.getLocalNameBytes());
@@ -1603,10 +1595,9 @@ public class FSDirectory implements Closeable {
 
     /**
      * Note:
-     * we can not use the iterator interface from LightWeightGSet to move inodes from inodeMapTemp to inodeMap.
-     * When we put an Inode into inodeMap, it will set the next pointer of this Inode object to a different value:
-     * we are effectively modifying the linked lists in inodeMapTemp when we are moving inodes using the iterator
-     * interface. To avoid this problem, we thus first remove an inode from inodeMapTemp and then add it to inodeMap.
+     * LightweightGSet uses linked lists, to implement a map. Thus, to move an Inode from one LightweightGSet
+     * (inodeMapTemp) to another (inodeMap), we need to first remove it from its original LightweightGSet and then add
+     * it to the new LightweightGSet.
      */
     Iterator<INodeWithAdditionalFields> iter = inodeMapTemp.iterator();
     while ( iter.hasNext() ) {
@@ -1624,7 +1615,7 @@ public class FSDirectory implements Closeable {
       throw new IOException(msg);
     }
 
-    inodeMap.show();
+    //inodeMap.show();
     inodeMapTemp.clear();
   }
 

@@ -48,7 +48,6 @@ class FSDirMkdirOp {
     }
     fsd.writeLock();
     try {
-      FSNamesystem.LOG.debug("mkdirs: path {}  ", src);
       INodesInPath iip = fsd.resolvePath(pc, src, DirOp.CREATE);
 
       final INode lastINode = iip.getLastINode();
@@ -281,7 +280,6 @@ class FSDirMkdirOp {
       INodesInPath existing, INode dir, PermissionStatus perm)
       throws IOException {
     assert fsd.hasWriteLock();
-    FSNamesystem.LOG.debug("addSingleDirectory created {} on path {}", dir, existing.getPath());
     INodesInPath iip = fsd.addLastINode(existing, dir, perm.getPermission(), true);
     if (iip == null) {
       FSNamesystem.LOG.debug("somebody already created {} on path {}", dir, existing.getPath());

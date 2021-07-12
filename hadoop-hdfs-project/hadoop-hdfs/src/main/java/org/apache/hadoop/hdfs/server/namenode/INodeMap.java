@@ -299,7 +299,7 @@ public class INodeMap {
     PermissionStatus perm = new PermissionStatus(
         "", "", new FsPermission((short) 0));
     // TODO: create a static array, to avoid creation of keys every time.
-    for(int p = 0; p < PARTITION_NUM; p++) {
+    for(int p = 0; p < NUM_RANGES_STATIC; p++) {
       INodeDirectory key = new INodeDirectory(
           INodeId.ROOT_INODE_ID, "range key".getBytes(), perm, 0);
       key.setParent(new INodeDirectory((long)p, null, perm, 0));

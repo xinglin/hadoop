@@ -265,25 +265,8 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
   @Override
   public String toString() {
     final StringBuilder b = new StringBuilder(getClass().getSimpleName());
-    int count1 = 0, count2 = 0;
-    for (int i = 0; i < entries.length; i++) {
-      LinkedElement e = entries[i];
-      while( e != null ) {
-        count1 ++;
-        e = e.getNext();
-      }
-    }
-
-    Iterator<E> iter = iterator();
-    while (iter.hasNext()) {
-      count2 ++;
-      iter.next();
-    }
-
     b.append("(size=").append(size)
-        .append(", count from linkedElement=").append(count1)
-        .append(", count from iterator=").append(count2)
-        .append(String.format(", %08x", hash_mask))
+     .append(String.format(", %08x", hash_mask))
      .append(", modification=").append(modification)
      .append(", entries.length=").append(entries.length)
      .append(")");
