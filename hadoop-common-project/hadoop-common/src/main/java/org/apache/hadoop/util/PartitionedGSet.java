@@ -24,7 +24,7 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
-
+import java.util.NoSuchElementException;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
@@ -79,8 +79,7 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
 
   public PartitionedGSet(final int capacity,
       final Comparator<? super K> comparator,
-      final LatchLock<?> latchLock,
-      final E rootKey) {
+      final LatchLock<?> latchLock) {
     this.partitions = new TreeMap<K, PartitionEntry>(comparator);
     this.latchLock = latchLock;
     // addNewPartition(rootKey).put(rootKey);
@@ -280,12 +279,22 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
 
     public EntryIterator() {
       keyIterator = partitions.keySet().iterator();
-      K curKey = partitions.firstKey();
-      partitionIterator = getPartition(curKey).iterator();
+ 
+      if (!keyIterator.hasNext()) {
+        partitionIterator = null;
+        return;
+      }
+
+      K firstKey = keyIterator.next();
+      partitionIterator = partitions.get(firstKey).iterator();
     }
 
     @Override
     public boolean hasNext() {
+
+      if (partitionIterator == null)
+        return false;
+
       while(!partitionIterator.hasNext()) {
         if(!keyIterator.hasNext()) {
           return false;
@@ -297,11 +306,9 @@ public class PartitionedGSet<K, E extends K> implements GSet<K, E> {
     }
 
     @Override
-    public E next() {
-      while(!partitionIterator.hasNext()) {
-        K curKey = keyIterator.next();
-        partitionIterator = getPartition(curKey).iterator();
-      }
+    public E next() throws NoSuchElementException {
+      if (!hasNext())
+        throw new NoSuchElementException("No more elements in this set.");
       return partitionIterator.next();
     }
   }
